@@ -23,6 +23,14 @@ void set_tss(uint32_t ss0, uint32_t esp0) {
 static PD kpd;
 static PT kpt[PHY_MEM / PT_SIZE] __attribute__((used));
 
+typedef union free_page {
+  union free_page *next;
+  char buf[PGSIZE];
+} page_t;
+
+page_t *free_page_list;
+
+
 void init_page() {
   extern char end;
   panic_on((size_t)(&end) >= KER_MEM - PGSIZE, "Kernel too big (MLE)");
@@ -31,28 +39,47 @@ void init_page() {
   static_assert(sizeof(PT) == PGSIZE, "PT must be one page");
   static_assert(sizeof(PD) == PGSIZE, "PD must be one page");
   // Lab1-4: init kpd and kpt, identity mapping of [0 (or 4096), PHY_MEM)
-  TODO();
+  //TODO();
+  for(int i=0; i < PHY_MEM / PT_SIZE; ++i){
+    kpd.pde[i].val=MAKE_PDE(&kpt[i],1);
+    for(int j=0; j < NR_PTE; ++j){
+      kpt[i].pte[j].val=MAKE_PTE((i << DIR_SHIFT) | (j << TBL_SHIFT),1);
+    }
+  }
   kpt[0].pte[0].val = 0;
   set_cr3(&kpd);
   set_cr0(get_cr0() | CR0_PG);
   // Lab1-4: init free memory at [KER_MEM, PHY_MEM), a heap for kernel
-  TODO();
+  //TODO();
+  free_page_list=(void*)KER_MEM;
 }
 
 void *kalloc() {
   // Lab1-4: alloc a page from kernel heap, abort when heap empty
-  TODO();
+  //TODO();
+  if((uint32_t)free_page_list>=PHY_MEM) assert(0);
+  memset(free_page_list,0,PGSIZE);
+  free_page_list=(void*)((uint32_t)free_page_list+PGSIZE);
+  return (void*)((uint32_t)free_page_list-PGSIZE);
 }
 
 void kfree(void *ptr) {
   // Lab1-4: free a page to kernel heap
   // you can just do nothing :)
   //TODO();
+  
 }
 
 PD *vm_alloc() {
   // Lab1-4: alloc a new pgdir, map memory under PHY_MEM identityly
-  TODO();
+  //TODO();
+  PD* pd=kalloc();
+  for(int i=0; i < PHY_MEM / PT_SIZE; ++i){
+    pd->pde[i].val=MAKE_PDE(&kpt[i],1);
+  }
+  for(int i=PHY_MEM / PT_SIZE;i<NR_PDE;++i)
+    pd->pde[i].val=0;
+  return pd;
 }
 
 void vm_teardown(PD *pgdir) {
@@ -67,18 +94,40 @@ PD *vm_curr() {
 
 PTE *vm_walkpte(PD *pgdir, size_t va, int prot) {
   // Lab1-4: return the pointer of PTE which match va
-  // if not exist (PDE of va is empty) and prot&1, alloc PT and fill the PDE
-  // if not exist (PDE of va is empty) and !(prot&1), return NULL
+  int pd_index = ADDR2DIR(va); 
+  PDE *pde = &(pgdir->pde[pd_index]);
+  if(pde->present==0){
+    if(prot!=0){
+      // if not exist (PDE of va is empty) and prot&1, alloc PT and fill the PDE
+      PT*pt=kalloc();
+      pde->val=MAKE_PDE(pt,prot);
+      int pt_index = ADDR2TBL(va); 
+      PTE *pte = &(pt->pte[pt_index]); 
+      return pte;
+    }
+    else{
+      // if not exist (PDE of va is empty) and !(prot&1), return NULL
+      return NULL;
+    }
+  }
   // remember to let pde's prot |= prot, but not pte
   assert((prot & ~7) == 0);
-  TODO();
+  PT *pt = PDE2PT(*pde);
+  int pt_index = ADDR2TBL(va);
+  PTE *pte = &(pt->pte[pt_index]);
+  return pte;
+  //TODO();
 }
 
 void *vm_walk(PD *pgdir, size_t va, int prot) {
   // Lab1-4: translate va to pa
   // if prot&1 and prot voilation ((pte->val & prot & 7) != prot), call vm_pgfault
   // if va is not mapped and !(prot&1), return NULL
-  TODO();
+  PTE* pte=vm_walkpte(pgdir,va,prot);
+  void *page = PTE2PG(*pte); 
+  void *pa = (void*)((uint32_t)page | ADDR2OFF(va));
+  return pa;
+  //TODO();
 }
 
 void vm_map(PD *pgdir, size_t va, size_t len, int prot) {
@@ -90,7 +139,16 @@ void vm_map(PD *pgdir, size_t va, size_t len, int prot) {
   size_t end = PAGE_UP(va + len);
   assert(start >= PHY_MEM);
   assert(end >= start);
-  TODO();
+  for(size_t i=start;i<end;i+=PGSIZE){
+    PTE* pte=vm_walkpte(pgdir,i,prot);
+    if(pte!=NULL){
+      if(pte->present==0){
+        void*p=kalloc();
+        pte->val=MAKE_PTE(p,prot);
+      }
+    }
+  }
+  //TODO();
 }
 
 void vm_unmap(PD *pgdir, size_t va, size_t len) {

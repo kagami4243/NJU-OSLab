@@ -108,7 +108,11 @@ void irq_handle(Context *ctx) {
   }
   switch (ctx->irq) {
   // TODO: Lab1-5 handle pagefault and syscall
+  case 14: vm_pgfault(get_cr2(),ctx->errcode);
+  case 128: do_syscall(ctx); break;
   // TODO: Lab1-7 handle serial and timer
+  case 36: serial_handle(); break;
+  case 32: timer_handle(); break;
   // TODO: Lab2-1 handle yield
   default: assert(ctx->irq >= T_IRQ0 && ctx->irq < T_IRQ0 + NR_INTR);
   }

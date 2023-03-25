@@ -148,5 +148,7 @@ typedef struct PageTable {
 #define PDE2PT(pde) ((PT*)((pde).page_frame << PGBITS))
 #define PTE2PG(pte) ((void*)((pte).page_frame << PGBITS))
 
+#define PROT(pte) (pte&0x7)
+
 #endif // __ASSEMBLER__
 #endif // __X86_MEMORY_H__

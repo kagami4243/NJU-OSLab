@@ -14,12 +14,12 @@ extern void *syscall_handle[NR_SYS];
 
 void do_syscall(Context *ctx) {
   // TODO: Lab1-5 call specific syscall handle and set ctx register
-  int sysnum = 0;
-  uint32_t arg1 = 0;
-  uint32_t arg2 = 0;
-  uint32_t arg3 = 0;
-  uint32_t arg4 = 0;
-  uint32_t arg5 = 0;
+  int sysnum = ctx->eax;
+  uint32_t arg1 = ctx->ebx;
+  uint32_t arg2 = ctx->ecx;
+  uint32_t arg3 = ctx->edx;
+  uint32_t arg4 = ctx->esi;
+  uint32_t arg5 = ctx->edi;
   int res;
   if (sysnum < 0 || sysnum >= NR_SYS) {
     res = -1;
@@ -46,7 +46,9 @@ int sys_brk(void *addr) {
   if (brk == 0) {
     brk = new_brk;
   } else if (new_brk > brk) {
-    TODO();
+    //TODO();
+    vm_map(vm_curr(),brk,new_brk-brk,7);
+    brk=new_brk;
   } else if (new_brk < brk) {
     // can just do nothing
   }
@@ -54,11 +56,26 @@ int sys_brk(void *addr) {
 }
 
 void sys_sleep(int ticks) {
-  TODO(); // Lab1-7
+  //TODO(); // Lab1-7
+  uint32_t tick=get_tick();
+  while(get_tick()<=tick+ticks){
+    sti(); hlt(); cli();
+  }
 }
 
 int sys_exec(const char *path, char *const argv[]) {
-  TODO(); // Lab1-8, Lab2-1
+  //TODO(); // Lab1-8, Lab2-1
+  PD *pgdir = vm_alloc();
+  Context ctx;
+  if(load_user(pgdir, &ctx, path, argv)!=0){
+    vm_teardown(pgdir);
+    return -1;
+  }
+  PD*pde=vm_curr();
+  set_cr3(pgdir);
+  vm_teardown(pde);
+  set_tss(KSEL(SEG_KDATA), (uint32_t)kalloc() + PGSIZE);
+  irq_iret(&ctx);
 }
 
 int sys_getpid() {
