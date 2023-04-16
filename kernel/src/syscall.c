@@ -41,15 +41,16 @@ int sys_read(int fd, void *buf, size_t count) {
 
 int sys_brk(void *addr) {
   // TODO: Lab1-5
-  static size_t brk = 0; // use brk of proc instead of this in Lab2-1
+  // use brk of proc instead of this in Lab2-1
+  proc_t*proc=proc_curr();
   size_t new_brk = PAGE_UP(addr);
-  if (brk == 0) {
-    brk = new_brk;
-  } else if (new_brk > brk) {
+  if (proc->brk == 0) {
+    proc->brk = new_brk;
+  } else if (new_brk > proc->brk) {
     //TODO();
-    vm_map(vm_curr(),brk,new_brk-brk,7);
-    brk=new_brk;
-  } else if (new_brk < brk) {
+    vm_map(vm_curr(),proc->brk,new_brk-proc->brk,7);
+    proc->brk=new_brk;
+  } else if (new_brk < proc->brk) {
     // can just do nothing
   }
   return 0;
@@ -59,7 +60,8 @@ void sys_sleep(int ticks) {
   //TODO(); // Lab1-7
   uint32_t tick=get_tick();
   while(get_tick()<=tick+ticks){
-    sti(); hlt(); cli();
+    //sti(); hlt(); cli();
+    proc_yield();
   }
 }
 
@@ -71,15 +73,17 @@ int sys_exec(const char *path, char *const argv[]) {
     vm_teardown(pgdir);
     return -1;
   }
+  proc_t*proc=proc_curr();
+  proc->pgdir=pgdir;
   PD*pde=vm_curr();
   set_cr3(pgdir);
   vm_teardown(pde);
-  set_tss(KSEL(SEG_KDATA), (uint32_t)kalloc() + PGSIZE);
   irq_iret(&ctx);
 }
 
 int sys_getpid() {
-  TODO(); // Lab2-1
+  //TODO(); // Lab2-1
+  return (proc_curr()->pid);
 }
 
 void sys_yield() {
@@ -87,15 +91,40 @@ void sys_yield() {
 }
 
 int sys_fork() {
-  TODO(); // Lab2-2
+  //TODO(); // Lab2-2
+  proc_t*proc=proc_alloc();
+  if(proc==NULL)
+    return -1;
+  else{
+    proc_copycurr(proc);
+    proc_addready(proc);
+    return proc->pid;
+  }
 }
 
 void sys_exit(int status) {
-  TODO(); // Lab2-3
+  //TODO(); // Lab2-3
+  proc_makezombie(proc_curr(),status);
+  INT(0x81);
+  assert(0);
 }
 
 int sys_wait(int *status) {
-  TODO(); // Lab2-3, Lab2-4
+  //TODO(); // Lab2-3, Lab2-4
+  proc_t*proc=proc_curr();
+  if(proc->child_num==0)
+    return -1;
+  proc_t*zombie=NULL;
+  while((zombie=proc_findzombie(proc))==NULL){
+    proc_yield();
+  }
+  if(status!=NULL){
+    *status=zombie->exit_code;
+  }
+  int pid=zombie->pid;
+  proc_free(zombie);
+  proc->child_num--;
+  return pid;
 }
 
 int sys_sem_open(int value) {

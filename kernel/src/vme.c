@@ -30,7 +30,6 @@ typedef union free_page {
 
 page_t *free_page_list;
 
-
 void init_page() {
   extern char end;
   panic_on((size_t)(&end) >= KER_MEM - PGSIZE, "Kernel too big (MLE)");
@@ -60,6 +59,7 @@ void *kalloc() {
   if((uint32_t)free_page_list>=PHY_MEM) assert(0);
   memset(free_page_list,0,PGSIZE);
   free_page_list=(void*)((uint32_t)free_page_list+PGSIZE);
+
   return (void*)((uint32_t)free_page_list-PGSIZE);
 }
 
@@ -161,7 +161,16 @@ void vm_unmap(PD *pgdir, size_t va, size_t len) {
 
 void vm_copycurr(PD *pgdir) {
   // Lab2-2: copy memory mapped in curr pd to pgdir
-  TODO();
+  //TODO();
+  proc_t*proc=proc_curr();
+  for(size_t va=PHY_MEM;va<USR_MEM;va+=PGSIZE){
+    PTE*pte=vm_walkpte(proc->pgdir,va,7);
+    if(pte!=NULL && pte->present!=0){
+      vm_map(pgdir,va,PGSIZE,7);
+      void* pa=vm_walk(pgdir,va,7);
+      memcpy(pa,(void*)va,PGSIZE);
+    }
+  }
 }
 
 void vm_pgfault(size_t va, int errcode) {
