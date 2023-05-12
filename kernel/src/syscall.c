@@ -115,6 +115,7 @@ int sys_wait(int *status) {
   if(proc->child_num==0)
     return -1;
   proc_t*zombie=NULL;
+  sem_p(&proc->zombie_sem);
   while((zombie=proc_findzombie(proc))==NULL){
     proc_yield();
   }
@@ -128,19 +129,47 @@ int sys_wait(int *status) {
 }
 
 int sys_sem_open(int value) {
-  TODO(); // Lab2-5
+  //TODO(); // Lab2-5
+  proc_t*proc=proc_curr();
+  int index=proc_allocusem(proc);
+  if(index==-1)
+    return -1;
+  usem_t*usem=usem_alloc(value);
+  if(usem==NULL)
+    return -1;
+  proc->usems[index]=usem;
+  return index;
 }
 
 int sys_sem_p(int sem_id) {
-  TODO(); // Lab2-5
+  //TODO(); // Lab2-5
+  proc_t*proc=proc_curr();
+  usem_t*usem=proc_getusem(proc,sem_id);
+  if(usem==NULL)
+    return -1;
+  sem_p(&usem->sem);
+  return 0;
 }
 
 int sys_sem_v(int sem_id) {
-  TODO(); // Lab2-5
+  //TODO(); // Lab2-5
+  proc_t*proc=proc_curr();
+  usem_t*usem=proc_getusem(proc,sem_id);
+  if(usem==NULL)
+    return -1;
+  sem_v(&usem->sem);
+  return 0;
 }
 
 int sys_sem_close(int sem_id) {
-  TODO(); // Lab2-5
+  //TODO(); // Lab2-5
+  proc_t*proc=proc_curr();
+  usem_t*usem=proc_getusem(proc,sem_id);
+  if(usem==NULL)
+    return -1;
+  usem_close(usem);
+  proc->usems[sem_id]=NULL;
+  return 0;
 }
 
 int sys_open(const char *path, int mode) {
