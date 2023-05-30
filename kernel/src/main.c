@@ -50,7 +50,7 @@ void init_user_and_go() {
   char *argv[] = {"sh",NULL};
   assert(load_user(proc->pgdir, proc->ctx, "sh", argv) == 0);
   proc_addready(proc);
-
+  proc->cwd=iopen("/",TYPE_NONE);
   // proc = proc_alloc();
   // assert(proc);
   // argv[1] = "1919810";

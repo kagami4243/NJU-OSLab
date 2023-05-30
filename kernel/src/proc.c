@@ -21,6 +21,7 @@ void init_proc() {
   for(int i=0;i<MAX_UFILE;++i)
     pcb[0].files[i]=NULL;
   // Lab3-2, set cwd
+  pcb[0].cwd=iopen("/",TYPE_NONE);
 }
 
 proc_t *proc_alloc() {
@@ -50,6 +51,7 @@ proc_t *proc_alloc() {
       proc->usems[i]=NULL;
     for(int i=0;i<MAX_UFILE;++i)
       proc->files[i]=NULL;
+    proc->cwd=NULL;
     return proc;
   }
 }
@@ -106,6 +108,7 @@ void proc_copycurr(proc_t *proc) {
   }
   // Lab3-1: dup opened files
   // Lab3-2: dup cwd
+  proc->cwd=idup(curr->cwd);
   //TODO();
 }
 
@@ -130,6 +133,7 @@ void proc_makezombie(proc_t *proc, int exitcode) {
       fclose(proc->files[i]);
   }
   // Lab3-2: close cwd
+  iclose(proc->cwd);
   //TODO();
 }
 
